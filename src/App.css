@@ -1,0 +1,319 @@
+.page {
+  min-height: 100svh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: var(--bg-alt);
+  padding: 10px 24px;
+}
+
+/* Three zones, left to right: text, bottle, Notifier 3 device shot.
+   The text column is a touch wider since it carries the most content; the
+   bottle and image columns match so the model sits truly centered in the
+   middle third rather than just left-of-center. */
+.product {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  gap: 56px;
+  max-width: 1400px;
+  width: 100%;
+}
+
+/* Media column — centered in its own track so the bottle never drifts
+   toward the text on the left or the empty space on the right. */
+.product-media {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.product-media-primary {
+  width: 100%;
+  /* Extra height only extends downward (top edge — and the space above the
+     bottle — is untouched); Bounds centers the model within this box, so a
+     taller box centers it slightly lower without moving the container's top. */
+  height: 630px;
+}
+
+/* Right third: the Notifier 3 device shot. Shows LOGO.png by default and
+   swaps to the matching color shot while that pen is picked up (see
+   onPenToggle in App.jsx) — every image here is the same 1044x495 source
+   photo, so the box never resizes or shifts between states. */
+.product-spacer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.notifier-image {
+  width: 100%;
+  max-width: 380px;
+  height: auto;
+  display: block;
+  margin-top: 180px;
+  transform: translateX(-170px);
+}
+
+/* No box on the primary viewer: no background/border/radius/clipping — the
+   canvas sits directly on the page so the pen-rise animation has room to move
+   freely without being cut off by a fixed-size container. */
+.sharpie-viewer {
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  position: relative;
+}
+
+/* Sits over the canvas from mount until ObjModelViewer confirms a fully
+   correct frame (fitted camera + HDRI lighting applied) has actually
+   rendered — see the comment above ObjModelViewer's `ready` state. Matches
+   the page background so there's nothing to flash against, and fades out
+   quickly rather than popping once the real render is confirmed ready. */
+.sharpie-viewer-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-alt);
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
+  pointer-events: none;
+}
+
+.sharpie-viewer-mask-hidden {
+  opacity: 0;
+}
+
+.sharpie-viewer-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(124, 92, 255, 0.25);
+  border-top-color: #7c5cff;
+  animation: sharpie-spin 0.8s linear infinite;
+}
+
+@keyframes sharpie-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Info column */
+.product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 50px;
+}
+
+.product-info h1 {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.4px;
+  color: var(--text-h);
+}
+
+.product-subtitle {
+  font-size: 14px;
+  color: var(--text);
+  margin-top: 6px;
+}
+
+.product-price {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-top: 14px;
+}
+
+.product-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.product-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 13px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-secondary {
+  background: #e4e6fb;
+  color: #34309e;
+}
+
+.btn-secondary:hover {
+  background: #d7daf7;
+}
+
+.btn-shop {
+  background: #5a31f4;
+  color: #fff;
+}
+
+.btn-shop:hover {
+  background: #4c26e0;
+}
+
+.shop-wordmark {
+  font-style: italic;
+  font-weight: 800;
+}
+
+/* Tabs */
+.product-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 26px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text-h);
+}
+
+.tab-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tab-active:hover {
+  color: #fff;
+}
+
+/* Tab panel */
+.product-tab-panel {
+  margin-top: 20px;
+  min-height: 180px;
+}
+
+.tab-description h2 {
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--text-h);
+  margin-top: 16px;
+  margin-bottom: 14px;
+}
+
+.tab-description p {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.tab-description strong {
+  color: var(--text-h);
+}
+
+.tab-description .disclaimers {
+  color: var(--text-h);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.tab-description .tagline {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.tab-included {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tab-included li {
+  font-size: 14.5px;
+  color: var(--text);
+  padding-left: 18px;
+  position: relative;
+}
+
+.tab-included li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.tab-videos {
+  font-size: 14.5px;
+  color: var(--text);
+}
+
+/* Benefits */
+.product-benefits {
+  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+.product-benefits h3 {
+  font-size: 16px;
+  color: var(--text-h);
+  margin-bottom: 14px;
+}
+
+.product-benefits ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.product-benefits li {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.product-benefits strong {
+  color: var(--text-h);
+}
+
+@media (max-width: 860px) {
+  .product {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .product-media-primary {
+    height: 380px;
+  }
+
+  .notifier-image {
+    max-width: 320px;
+  }
+}
