@@ -193,8 +193,15 @@ function playReturn(group, onComplete) {
   })
 }
 
-function SharpiePenModel({ onPenToggle, ...props }) {
-  const fbx = useLoader(FBXLoader, MODEL_URL)
+function SharpiePenModel({ onPenToggle, onLoadProgress, ...props }) {
+  // Byte-level progress for the FBX specifically (not three.js's built-in
+  // LoadingManager, which only counts *files* loaded out of files total —
+  // with one 130MB+ model next to a handful of small textures, that would
+  // sit at 0% for nearly the entire wait and then jump straight to 100%,
+  // not something a percentage bar can meaningfully show).
+  const fbx = useLoader(FBXLoader, MODEL_URL, undefined, (event) => {
+    if (event.lengthComputable) onLoadProgress?.(event.loaded, event.total)
+  })
   const labelTexture = useLoader(THREE.TextureLoader, TEXTURE_URL)
   labelTexture.colorSpace = THREE.SRGBColorSpace
   // Source artwork reads top-to-bottom along the pen's length; rotate 90°
@@ -346,18 +353,6 @@ function SharpiePenModel({ onPenToggle, ...props }) {
     handlePenClick(penIndex)
   }
 
-  useEffect(() => {
-    window.__debugClickPen = handlePenClick
-    window.__debugPenState = () => ({
-      active: activePenIndexRef.current,
-      pens: penState.current.map((s) => ({ isOut: s.isOut, isAnimating: s.isAnimating })),
-    })
-    return () => {
-      delete window.__debugClickPen
-      delete window.__debugPenState
-    }
-  })
-
   return <primitive object={fbx} onClick={handleClick} {...props} />
 }
 
@@ -479,7 +474,7 @@ function HDRIEnvironment({ url, onReady }) {
   return null
 }
 
-export default function ObjModelViewer({ onPenToggle }) {
+export default function ObjModelViewer({ onPenToggle, onLoadProgress, onReady }) {
   // Gates the canvas's visual reveal behind an opaque DOM mask (not just a
   // WebGL-level clear color) until the scene has *actually* rendered a frame
   // with both the fitted camera position and HDRI lighting applied — not
@@ -496,7 +491,10 @@ export default function ObjModelViewer({ onPenToggle }) {
   // briefly, regardless of exactly which frame it would have landed on — the
   // mask only fades away once HDRIEnvironment reports back (see its onReady).
   const [ready, setReady] = useState(false)
-  const handleReady = useCallback(() => setReady(true), [])
+  const handleReady = useCallback(() => {
+    setReady(true)
+    onReady?.()
+  }, [onReady])
 
   return (
     <div className="sharpie-viewer">
@@ -531,9 +529,13 @@ export default function ObjModelViewer({ onPenToggle }) {
               holder material. Forcing this near-zero makes Bounds jump
               straight to the same final fitted position instead of animating
               into it — same end framing, no transient angles exposed. */}
-          <Bounds fit margin={1.3} maxDuration={0.001}>
+          {/* margin: how much empty space Bounds leaves around the fitted
+              object — lower means the camera sits closer, so the model reads
+              larger on screen. Tightened from 1.3 to make the bottle
+              slightly bigger while still leaving a clear margin. */}
+          <Bounds fit margin={0.96} maxDuration={0.001}>
             <Center position={[0, 0, 0]}>
-              <SharpiePenModel onPenToggle={onPenToggle} />
+              <SharpiePenModel onPenToggle={onPenToggle} onLoadProgress={onLoadProgress} />
             </Center>
           </Bounds>
           <ShadowBlob />
@@ -543,6 +545,10 @@ export default function ObjModelViewer({ onPenToggle }) {
           autoRotate
           autoRotateSpeed={1.2}
           enablePan={false}
+          // Scroll/pinch zoom would let the user change the model's apparent
+          // size away from the fixed framing Bounds just set up — disabled
+          // so the size stays exactly as fitted, not user-adjustable.
+          enableZoom={false}
           // Vertical orbit only — horizontal (azimuth) stays unrestricted, still
           // a full 360°. Polar angle is measured from world "up" (0 = straight
           // down from above, PI = straight up from below); the camera starts at
