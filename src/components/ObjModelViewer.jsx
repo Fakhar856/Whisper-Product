@@ -1,4 +1,4 @@
-import { Suspense, useRef, useMemo, useEffect, useState, useCallback } from 'react'
+import { Suspense, useRef, useMemo, useEffect, useState, useCallback, Component } from 'react'
 import { Canvas, useLoader, useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls, Center, Bounds } from '@react-three/drei'
 import { FBXLoader, EXRLoader } from 'three-stdlib'
@@ -365,6 +365,37 @@ function Loader() {
   )
 }
 
+// R3F's <Canvas> propagates render errors from its inner scene-graph
+// reconciler up to a normal DOM-tree error boundary wrapping it — without
+// one, a bad/missing asset (e.g. the FBX 404ing, or a corrupt file) crashes
+// the entire React root with no fallback, taking the whole page blank
+// instead of just this component. Also reports up via onError so the
+// page-level loading screen (which is waiting on this component's own
+// onReady) doesn't hang forever if the model never finishes loading.
+class ModelErrorBoundary extends Component {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error) {
+    console.error('Bottle model failed to load:', error)
+    this.props.onError?.()
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="sharpie-viewer-error">
+          Couldn&rsquo;t load the 3D preview.
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 // drei's <ContactShadows> (a per-frame depth-capture render) produced nothing
 // visible in this scene despite correct positioning and no console errors —
 // swapped for a plain radial-gradient "blob" shadow instead: a soft
@@ -508,57 +539,59 @@ export default function ObjModelViewer({ onPenToggle, onLoadProgress, onReady })
           enough to prevent every bad-looking frame (see the mask below for
           the rest), but it means whatever the mask ever fails to cover is at
           worst the page's own background, never a black rectangle. */}
-      <Canvas
-        flat
-        gl={{ alpha: true }}
-        onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
-        camera={{ position: [0, 0, 4], fov: 45 }}
-        dpr={[1, 2]}
-        shadows
-      >
-        <ambientLight intensity={1.6} />
-        <spotLight position={[3, 6, 3]} angle={0.4} penumbra={1} intensity={18} castShadow />
-        <pointLight position={[-4, 1, -4]} intensity={6} />
-        <Suspense fallback={<Loader />}>
-          <HDRIEnvironment url={HDRI_URL} onReady={handleReady} />
-          {/* maxDuration: drei's default is 1s, animating the camera from its
-              declared start position [0,0,4] to the fitted framing via lerp —
-              that's the "loads from the back and zooms in" 1s window. The
-              spotlight is tuned for the *final* framing only, so mid-lerp
-              angles can catch none of it and read as solid black on the dark
-              holder material. Forcing this near-zero makes Bounds jump
-              straight to the same final fitted position instead of animating
-              into it — same end framing, no transient angles exposed. */}
-          {/* margin: how much empty space Bounds leaves around the fitted
-              object — lower means the camera sits closer, so the model reads
-              larger on screen. Tightened from 1.3 to make the bottle
-              slightly bigger while still leaving a clear margin. */}
-          <Bounds fit margin={0.96} maxDuration={0.001}>
-            <Center position={[0, 0, 0]}>
-              <SharpiePenModel onPenToggle={onPenToggle} onLoadProgress={onLoadProgress} />
-            </Center>
-          </Bounds>
-          <ShadowBlob />
-        </Suspense>
-        <OrbitControls
-          makeDefault
-          autoRotate
-          autoRotateSpeed={1.2}
-          enablePan={false}
-          // Scroll/pinch zoom would let the user change the model's apparent
-          // size away from the fixed framing Bounds just set up — disabled
-          // so the size stays exactly as fitted, not user-adjustable.
-          enableZoom={false}
-          // Vertical orbit only — horizontal (azimuth) stays unrestricted, still
-          // a full 360°. Polar angle is measured from world "up" (0 = straight
-          // down from above, PI = straight up from below); the camera starts at
-          // [0,0,4] looking at the origin, i.e. the default horizontal view sits
-          // at PI/2. More room downward (to peek further into the holder's
-          // opening) than upward (kept tight so the underside stays out of view).
-          minPolarAngle={Math.PI / 2 - 0.6}
-          maxPolarAngle={Math.PI / 2 + 0.06}
-        />
-      </Canvas>
+      <ModelErrorBoundary onError={handleReady}>
+        <Canvas
+          flat
+          gl={{ alpha: true }}
+          onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
+          camera={{ position: [0, 0, 4], fov: 45 }}
+          dpr={[1, 2]}
+          shadows
+        >
+          <ambientLight intensity={1.6} />
+          <spotLight position={[3, 6, 3]} angle={0.4} penumbra={1} intensity={18} castShadow />
+          <pointLight position={[-4, 1, -4]} intensity={6} />
+          <Suspense fallback={<Loader />}>
+            <HDRIEnvironment url={HDRI_URL} onReady={handleReady} />
+            {/* maxDuration: drei's default is 1s, animating the camera from its
+                declared start position [0,0,4] to the fitted framing via lerp —
+                that's the "loads from the back and zooms in" 1s window. The
+                spotlight is tuned for the *final* framing only, so mid-lerp
+                angles can catch none of it and read as solid black on the dark
+                holder material. Forcing this near-zero makes Bounds jump
+                straight to the same final fitted position instead of animating
+                into it — same end framing, no transient angles exposed. */}
+            {/* margin: how much empty space Bounds leaves around the fitted
+                object — lower means the camera sits closer, so the model reads
+                larger on screen. Tightened from 1.3 to make the bottle
+                slightly bigger while still leaving a clear margin. */}
+            <Bounds fit margin={0.96} maxDuration={0.001}>
+              <Center position={[0, 0, 0]}>
+                <SharpiePenModel onPenToggle={onPenToggle} onLoadProgress={onLoadProgress} />
+              </Center>
+            </Bounds>
+            <ShadowBlob />
+          </Suspense>
+          <OrbitControls
+            makeDefault
+            autoRotate
+            autoRotateSpeed={1.2}
+            enablePan={false}
+            // Scroll/pinch zoom would let the user change the model's apparent
+            // size away from the fixed framing Bounds just set up — disabled
+            // so the size stays exactly as fitted, not user-adjustable.
+            enableZoom={false}
+            // Vertical orbit only — horizontal (azimuth) stays unrestricted, still
+            // a full 360°. Polar angle is measured from world "up" (0 = straight
+            // down from above, PI = straight up from below); the camera starts at
+            // [0,0,4] looking at the origin, i.e. the default horizontal view sits
+            // at PI/2. More room downward (to peek further into the holder's
+            // opening) than upward (kept tight so the underside stays out of view).
+            minPolarAngle={Math.PI / 2 - 0.6}
+            maxPolarAngle={Math.PI / 2 + 0.06}
+          />
+        </Canvas>
+      </ModelErrorBoundary>
       {/* Fresh useState per mount, so this re-covers correctly every time
           ObjModelViewer mounts, not just on first page load. */}
       <div className={`sharpie-viewer-mask${ready ? ' sharpie-viewer-mask-hidden' : ''}`}>

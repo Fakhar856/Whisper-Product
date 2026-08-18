@@ -198,6 +198,21 @@
   opacity: 0;
 }
 
+/* Fallback shown in place of the canvas if the model genuinely fails to
+   load (see ModelErrorBoundary) — fills the same space so the rest of the
+   page layout doesn't shift. */
+.sharpie-viewer-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  font-size: 14px;
+  color: var(--text);
+}
+
 .sharpie-viewer-spinner {
   width: 34px;
   height: 34px;
