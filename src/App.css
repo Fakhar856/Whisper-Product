@@ -164,7 +164,12 @@
   height: auto;
   display: block;
   margin-top: 230px;
-  transform: translateX(-170px);
+  /* width/max-width don't actually control the rendered size here — the
+     image already fills its grid column at 100%, which is narrower than
+     max-width, so max-width was never the real constraint. scale() enlarges
+     it directly regardless of the column's width; applied after translateX
+     so the -170px shift stays a fixed amount, not scaled along with it. */
+  transform: translateX(-170px) scale(1.3);
 }
 
 /* No box on the primary viewer: no background/border/radius/clipping — the

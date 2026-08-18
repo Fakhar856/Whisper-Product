@@ -5,7 +5,17 @@ import { FBXLoader, EXRLoader } from 'three-stdlib'
 import gsap from 'gsap'
 import * as THREE from 'three'
 
-const MODEL_URL = encodeURI('/models/SHARPIE PEN.fbx')
+// Hosted externally (Vercel Blob) rather than from public/ — at 136MB it's
+// over GitHub's 100MB push limit, and Vercel's build doesn't resolve Git LFS
+// pointers, so a git-tracked copy can't reliably reach production.
+const MODEL_URL = 'https://kagfwvv0cdnbanck.public.blob.vercel-storage.com/SHARPIE%20PEN.fbx'
+// Vercel Blob's CORS config doesn't expose Content-Length to cross-origin
+// fetch() (only a fixed safelist of headers is exposed unless the server
+// adds Access-Control-Expose-Headers, which this endpoint doesn't), so
+// event.total/lengthComputable from the loader's progress callback can't be
+// trusted here — falls back to this known exact size instead, so the
+// progress bar keeps working smoothly regardless.
+const MODEL_SIZE_BYTES = 135993088
 const TEXTURE_URL = '/models/textures/sharpie-texture-bold.png'
 const HDRI_URL = encodeURI('/cayley_interior_2k.exr')
 
@@ -200,7 +210,8 @@ function SharpiePenModel({ onPenToggle, onLoadProgress, ...props }) {
   // sit at 0% for nearly the entire wait and then jump straight to 100%,
   // not something a percentage bar can meaningfully show).
   const fbx = useLoader(FBXLoader, MODEL_URL, undefined, (event) => {
-    if (event.lengthComputable) onLoadProgress?.(event.loaded, event.total)
+    const total = event.lengthComputable && event.total ? event.total : MODEL_SIZE_BYTES
+    onLoadProgress?.(event.loaded, total)
   })
   const labelTexture = useLoader(THREE.TextureLoader, TEXTURE_URL)
   labelTexture.colorSpace = THREE.SRGBColorSpace
