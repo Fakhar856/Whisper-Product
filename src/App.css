@@ -393,10 +393,14 @@
    and a gently pulsing dot so it reads as "this is interactive" without
    competing with the model or the description above it. */
 .product-hint {
+  position: absolute;
+  top: 48px;
+  left: 100%;
+  transform: translateX(-50%);
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  margin-top: 22px;
   padding: 7px 14px 7px 12px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -407,6 +411,7 @@
   color: var(--accent-dark);
   letter-spacing: 0.2px;
   width: fit-content;
+  white-space: nowrap;
 }
 
 .product-hint-dot {

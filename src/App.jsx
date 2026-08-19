@@ -163,18 +163,6 @@ function App() {
                   create a fully self-contained, professional-grade color prediction and peek
                   system.
                 </p>
-                <p>
-                  Hand your spectator a set of ordinary colored markers, turn your back, and
-                  still know <strong>exactly</strong> which color they&rsquo;ve chosen. At the same time,
-                  your <strong>Notifier 3</strong> silently streams real-time information from{' '}
-                  <strong>PenSense Lite</strong> (and the wider Unifi ecosystem) to a tiny,
-                  high-resolution display hidden wherever you need it.
-                </p>
-                <p className="product-hint">
-                  <span className="product-hint-dot" aria-hidden="true" />
-                  Click a pen to see the magic
-                  <span className="product-hint-arrow" aria-hidden="true">→</span>
-                </p>
               </div>
             )}
 
@@ -204,6 +192,10 @@ function App() {
         </div>
 
         <div className="product-media">
+          <p className="product-hint">
+            <span className="product-hint-dot" aria-hidden="true" />
+            Hit the pen
+          </p>
           <div className="product-media-primary">
             <ObjModelViewer
               onPenToggle={(color, isOut) => setActivePenColor(isOut ? color : null)}
