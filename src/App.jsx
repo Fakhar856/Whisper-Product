@@ -170,10 +170,11 @@ function App() {
                   <strong>PenSense Lite</strong> (and the wider Unifi ecosystem) to a tiny,
                   high-resolution display hidden wherever you need it.
                 </p>
-                <p className="disclaimers">
-                  No gimmicked pens. No strange handling. No assistants.
+                <p className="product-hint">
+                  <span className="product-hint-dot" aria-hidden="true" />
+                  Click a pen to see the magic
+                  <span className="product-hint-arrow" aria-hidden="true">→</span>
                 </p>
-                <p className="tagline">Just clean, impossible mentalism.</p>
               </div>
             )}
 

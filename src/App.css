@@ -239,10 +239,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Pulled back from 80px — that much dead space before the heading even
-     starts was a big part of why the page grew taller than a laptop
-     viewport, pushing the lower paragraphs below the fold. */
-  margin-top: 20px;
+  margin-top: 80px;
   margin-left: 24px;
   /* Highest of the three columns' stacking layers — text/UI always sits
      above both the model (z-index: 2) and the background image (z-index:
@@ -348,7 +345,7 @@
 
 /* Tab panel */
 .product-tab-panel {
-  margin-top: 20px;
+  margin-top: 8px;
   min-height: 180px;
 }
 
@@ -361,7 +358,7 @@
 }
 
 .tab-description {
-  margin-top: 50px;
+  margin-top: 16px;
 }
 
 .tab-description h1 {
@@ -389,6 +386,66 @@
 .tab-description .tagline {
   font-weight: 600;
   color: var(--text-h);
+}
+
+/* Small, subtle nudge toward the 3D pens — deliberately not styled like a
+   button (no background/border/padding-box), just a bit of color/weight
+   and a gently pulsing dot so it reads as "this is interactive" without
+   competing with the model or the description above it. */
+.product-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 22px;
+  padding: 7px 14px 7px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  font-size: 13px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--accent-dark);
+  letter-spacing: 0.2px;
+  width: fit-content;
+}
+
+.product-hint-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: product-hint-pulse 2s ease-in-out infinite;
+}
+
+.product-hint-arrow {
+  font-style: normal;
+  color: var(--accent);
+  display: inline-block;
+  animation: product-hint-nudge 1.6s ease-in-out infinite;
+}
+
+@keyframes product-hint-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 3px 0 color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 9px 3px color-mix(in srgb, var(--accent) 65%, transparent);
+  }
+}
+
+@keyframes product-hint-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateX(4px);
+    opacity: 1;
+  }
 }
 
 .tab-included {
