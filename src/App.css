@@ -37,23 +37,11 @@
   gap: 22px;
 }
 
-/* Soft halo behind the ring for a bit of depth instead of a flat card —
-   purely decorative, sits behind everything else in this stack. Gold,
-   matching the Illuminati Magic emblem's own color (sampled directly from
-   loading logo changed.png: ~#b7995a), not the site's blue/purple accent. */
-.page-loader-content::before {
-  content: '';
-  position: absolute;
-  inset: -70px;
-  z-index: -1;
-  background: radial-gradient(circle, rgba(183, 153, 90, 0.16), transparent 70%);
-  pointer-events: none;
-}
 
 .page-loader-ring {
   position: relative;
-  width: 172px;
-  height: 172px;
+  width: 150px;
+  height: 150px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -99,7 +87,7 @@
 }
 
 .page-loader-logo {
-  width: 92px;
+  width: 80px;
   height: auto;
   display: block;
 }
@@ -141,9 +129,8 @@
 
 .product-media-primary {
   width: 100%;
-  /* Extra height only extends downward (top edge — and the space above the
-     bottle — is untouched); Bounds centers the model within this box, so a
-     taller box centers it slightly lower without moving the container's top. */
+  /* Restored to its previous working size (500px read as too small/zoomed
+     out on laptop/desktop). */
   height: 630px;
 }
 
@@ -163,6 +150,8 @@
   max-width: 380px;
   height: auto;
   display: block;
+  /* Restored to its previous working position/size — 100px read as too
+     small/zoomed out on laptop/desktop. */
   margin-top: 230px;
   /* width/max-width don't actually control the rendered size here — the
      image already fills its grid column at 100%, which is narrower than
@@ -238,12 +227,16 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 80px;
+  /* Pulled back from 80px — that much dead space before the heading even
+     starts was a big part of why the page grew taller than a laptop
+     viewport, pushing the lower paragraphs below the fold. */
+  margin-top: 20px;
   margin-left: 24px;
 }
 
 .product-info h1 {
-  font-size: 34px;
+  /* Nudged down from 34px, then again from 30px. Mobile breakpoints untouched. */
+  font-size: 27px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.4px;
@@ -350,6 +343,14 @@
   margin-bottom: 14px;
 }
 
+.tab-description {
+  margin-top: 50px;
+}
+
+.tab-description h1 {
+  margin-bottom: 16px;
+}
+
 .tab-description p {
   font-size: 14.5px;
   line-height: 1.65;
@@ -438,16 +439,64 @@
 }
 
 @media (max-width: 860px) {
+  .page {
+    padding: 16px 20px;
+  }
+
   .product {
     grid-template-columns: 1fr;
     gap: 32px;
+  }
+
+  /* Both margins here were tuned for sitting next to the bottle/image
+     columns in the desktop 3-column grid — in the stacked single-column
+     layout the text is already the first thing on the page, so it doesn't
+     need to be pushed down or indented to line up with anything. */
+  .product-info {
+    margin-top: 0;
+    margin-left: 0;
+  }
+
+  .product-info h1 {
+    font-size: 28px;
   }
 
   .product-media-primary {
     height: 380px;
   }
 
+  /* translateX(-170px) and the 1.3x scale were compensating for sitting in
+     a ~394px-wide desktop grid column next to the bottle — meaningless (and
+     actively harmful: it would push the image off-screen) once this column
+     is full-width and stacked below the bottle instead. margin-top was
+     likewise sized against the desktop canvas's fixed 630px height, not the
+     380px one used here. */
   .notifier-image {
-    max-width: 320px;
+    max-width: 300px;
+    margin-top: 24px;
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .product-info h1 {
+    font-size: 24px;
+  }
+
+  .product-media-primary {
+    height: 320px;
+  }
+
+  .notifier-image {
+    max-width: 240px;
+  }
+
+  .page-loader-ring {
+    width: 140px;
+    height: 140px;
+  }
+
+  .page-loader-logo {
+    width: 76px;
   }
 }

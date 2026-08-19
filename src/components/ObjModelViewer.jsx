@@ -1,6 +1,6 @@
 import { Suspense, useRef, useMemo, useEffect, useState, useCallback, Component } from 'react'
 import { Canvas, useLoader, useThree, useFrame } from '@react-three/fiber'
-import { OrbitControls, Center, Bounds } from '@react-three/drei'
+import { Center, Bounds } from '@react-three/drei'
 import { FBXLoader, EXRLoader } from 'three-stdlib'
 import gsap from 'gsap'
 import * as THREE from 'three'
@@ -22,10 +22,10 @@ const HDRI_URL = encodeURI('/cayley_interior_2k.exr')
 // The holder's actual resting base in world space, read directly off the cup
 // mesh's bounding box after Bounds/Center place the model (verified: a test
 // plane dropped at this exact position lined up with the cup's visible base).
-// The cup itself never moves — only the pens rise/fall — so a shadow anchored
-// here is correctly "under the bottle" for the model's entire lifetime.
-// Nudged slightly further down (more negative) than that measured base, for
-// a touch more breathing room between the cup and the shadow.
+// Fixed on purpose — this shadow is a sibling of TurntableGroup, not a child
+// of it, and never reads the model's current tilt: it represents the floor
+// under the bottle, not something attached to the bottle itself, so it
+// should never move onto or behind it as the model tilts.
 const SHADOW_Y = -2.85
 const SHADOW_DIAMETER = 4.5
 
@@ -407,13 +407,17 @@ class ModelErrorBoundary extends Component {
   }
 }
 
-// drei's <ContactShadows> (a per-frame depth-capture render) produced nothing
-// visible in this scene despite correct positioning and no console errors —
-// swapped for a plain radial-gradient "blob" shadow instead: a soft
-// black-to-transparent circle baked once into a canvas texture. Much less
-// capable (it can't pick up cast shapes), but for a single static object
-// sitting on flat ground it reads the same, and it can't silently fail the
-// way a multi-pass render-to-texture effect can.
+// A soft contact shadow directly under the bottle. Deliberately just a flat
+// radial-gradient "blob" baked once into a canvas texture, positioned as a
+// sibling of TurntableGroup — reads as the floor under the bottle. Needs no
+// tracking logic at all: "vertical drag" now orbits the camera rather than
+// tilting the model (see TurntableGroup), so the model itself never
+// actually moves in world space, and a shadow that never moves either stays
+// correctly positioned relative to it automatically — the same reason this
+// was trivially correct before the lighting rewrite ever introduced model
+// rotation. drei's <ContactShadows> (a real per-frame depth-capture render)
+// was tried first and produced nothing visible in this scene despite
+// correct positioning and no console errors.
 function ShadowBlob() {
   const texture = useMemo(() => {
     const size = 256
@@ -446,8 +450,8 @@ function ShadowBlob() {
     ctx.fillRect(0, 0, size, size)
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
-    // The plane is seen at a near edge-on angle (OrbitControls' vertical
-    // range is deliberately tight), so on screen it compresses to just a
+    // The plane is seen at a near edge-on angle (the camera sits close to
+    // the model's own vertical level), so on screen it compresses to just a
     // handful of pixels tall. With mipmapping on, the GPU was averaging the
     // dark center texel together with this texture's fully-transparent
     // corners for every sampled pixel — measured effective opacity came out
@@ -486,11 +490,22 @@ function HDRIEnvironment({ url, onReady }) {
     pmremGenerator.compileEquirectangularShader()
     const envRenderTarget = pmremGenerator.fromEquirectangular(hdriTexture)
     scene.environment = envRenderTarget.texture
+    // This HDRI is noticeably dimmer toward its bottom pole than its top/
+    // equator (sampled directly: ~8.2k avg luminance at the very bottom row
+    // vs ~11.9-12.7k around the equator and top) — a normal interior-HDRI
+    // shape (bright ceiling, dim floor), but it meant materials facing
+    // downward (the underside, once tilting could reveal it) picked up very
+    // little IBL contribution. Rotating the environment's sampling around X
+    // redirects what "down" reads from toward that brighter equatorial band
+    // instead, without changing overall intensity, material settings, or
+    // what reflections look like from the *normal* viewing angles.
+    scene.environmentRotation.set(0.5, 0, 0)
     readyFrames.current = 0
     firedReady.current = false
 
     return () => {
       scene.environment = null
+      scene.environmentRotation.set(0, 0, 0)
       envRenderTarget.texture.dispose()
       pmremGenerator.dispose()
     }
@@ -516,6 +531,115 @@ function HDRIEnvironment({ url, onReady }) {
   return null
 }
 
+// Spins the model itself in place instead of orbiting the camera around a
+// stationary one. With the camera and the scene's lights/HDRI all fixed in
+// world space, a group that rotates is what makes different faces of the
+// bottle actually sweep through the light as it turns (brighter facing it,
+// darker facing away, reflections sliding across the surface) — camera-orbit
+// around a static model can't produce that: each world-space-facing side of
+// the object would always be exactly as lit as it always was, since neither
+// the object nor the fixed lights ever move relative to each other; orbiting
+// the camera only changes how much of the (permanently) lit vs shadowed side
+// you happen to be looking at.
+const AUTO_SPIN_RADIANS_PER_SEC = 0.3
+const DRAG_ROTATE_SENSITIVITY = 0.008
+// Vertical drag moves the *camera* in a polar-angle orbit around the model
+// instead of tilting the model itself — unlike horizontal spin, tilting the
+// model vertically doesn't serve the lighting-sweep goal (a small tilt back
+// and forth doesn't showcase different faces catching the light the way a
+// full spin does), and it made a same-world-space-position contact shadow
+// impossible to keep looking right: every version of "make the shadow
+// track a tilting model" either overshot onto the bottle or needed
+// increasingly complex geometry to avoid it. Orbiting the camera instead
+// means the model (and the shadow under it) never actually move in world
+// space during a vertical drag — they stay in perfect sync by construction,
+// the same way they did before the lighting rewrite, while horizontal
+// spin still rotates the model for the lighting effect. Ported directly
+// from OrbitControls' own polar-angle math/sign convention and the
+// original minPolarAngle/maxPolarAngle span (rather than re-derived) since
+// getting the sign right by re-reasoning about it took several wrong
+// guesses last time.
+const CAMERA_POLAR_MIN = -0.6
+const CAMERA_POLAR_MAX = 0.06
+// How many rendered frames to wait before capturing the camera's resting
+// spherical position — Bounds' own fit-to-camera snap needs at least one
+// frame to take effect (see maxDuration below); waiting a few is a safety
+// margin so this never captures a pre-fit, still-transitioning position.
+const CAMERA_REST_CAPTURE_FRAMES = 5
+
+function TurntableGroup({ children }) {
+  const groupRef = useRef(null)
+  const { gl, camera } = useThree()
+  const rotationY = useRef(0)
+  const polarOffset = useRef(0)
+  const dragging = useRef(false)
+  const lastX = useRef(0)
+  const lastY = useRef(0)
+  const cameraRest = useRef(null)
+  const captureFrames = useRef(0)
+
+  useEffect(() => {
+    const canvas = gl.domElement
+    const handlePointerDown = (event) => {
+      dragging.current = true
+      lastX.current = event.clientX
+      lastY.current = event.clientY
+    }
+    const handlePointerMove = (event) => {
+      if (!dragging.current) return
+      const deltaX = event.clientX - lastX.current
+      const deltaY = event.clientY - lastY.current
+      lastX.current = event.clientX
+      lastY.current = event.clientY
+      rotationY.current += deltaX * DRAG_ROTATE_SENSITIVITY
+      // OrbitControls' own formula (rotateSpeed default 1.0) and its own
+      // sign: rotateUp() does `sphericalDelta.phi -= angle`, so a real `-=`
+      // here, not `+=`.
+      const verticalSensitivity = (2 * Math.PI) / canvas.clientHeight
+      const nextOffset = polarOffset.current - deltaY * verticalSensitivity
+      polarOffset.current = Math.min(CAMERA_POLAR_MAX, Math.max(CAMERA_POLAR_MIN, nextOffset))
+    }
+    const handlePointerUp = () => {
+      dragging.current = false
+    }
+    // Plain DOM listeners (not R3F pointer props) so this never interferes
+    // with the pens' own onClick — that's a separate, R3F-raycasted event
+    // system reading the same underlying browser events independently.
+    canvas.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    return () => {
+      canvas.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [gl])
+
+  useFrame((_, delta) => {
+    if (!dragging.current) {
+      rotationY.current += AUTO_SPIN_RADIANS_PER_SEC * delta
+    }
+    if (groupRef.current) {
+      groupRef.current.rotation.y = rotationY.current
+    }
+
+    if (!cameraRest.current) {
+      captureFrames.current += 1
+      if (captureFrames.current >= CAMERA_REST_CAPTURE_FRAMES) {
+        cameraRest.current = new THREE.Spherical().setFromVector3(camera.position)
+      }
+      return
+    }
+
+    const { radius, phi, theta } = cameraRest.current
+    const newPhi = THREE.MathUtils.clamp(phi + polarOffset.current, 0.01, Math.PI - 0.01)
+    camera.position.setFromSphericalCoords(radius, newPhi, theta)
+    camera.lookAt(0, 0, 0)
+  })
+
+  return <group ref={groupRef}>{children}</group>
+}
+
 export default function ObjModelViewer({ onPenToggle, onLoadProgress, onReady }) {
   // Gates the canvas's visual reveal behind an opaque DOM mask (not just a
   // WebGL-level clear color) until the scene has *actually* rendered a frame
@@ -537,7 +661,6 @@ export default function ObjModelViewer({ onPenToggle, onLoadProgress, onReady })
     setReady(true)
     onReady?.()
   }, [onReady])
-
   return (
     <div className="sharpie-viewer">
       {/* `flat` disables r3f's default ACESFilmicToneMapping, so nothing softens or
@@ -559,9 +682,28 @@ export default function ObjModelViewer({ onPenToggle, onLoadProgress, onReady })
           dpr={[1, 2]}
           shadows
         >
+          {/* The point wasn't "brighter" — it was that every light here was
+              positioned for one specific viewing angle, so tilting/spinning
+              to any other angle kept finding new unlit surfaces no matter
+              how much any single light's intensity went up. Rebuilt as a
+              small rig surrounding the model from several directions
+              instead: top-right (existing key light), back-left (existing
+              side fill), now front (camera side) and below (underside) too
+              — so wherever a drag turns the model, something nearby is
+              actually lit, rather than chasing one angle at a time. */}
           <ambientLight intensity={1.6} />
           <spotLight position={[3, 6, 3]} angle={0.4} penumbra={1} intensity={18} castShadow />
           <pointLight position={[-4, 1, -4]} intensity={6} />
+          {/* Front fill, roughly from the camera — covers whichever face is
+              turned toward the viewer as the model spins, which none of the
+              other lights (all off to the sides/above) reliably do. Kept
+              low so it adds coverage without reading as brighter overall —
+              original intensities (ambient 1.6, others above) are otherwise
+              untouched. */}
+          <pointLight position={[0, 1, 5]} intensity={2} />
+          {/* Underside fill — sits below the model's base, angled up toward
+              it, for when tilting reveals the bottom. */}
+          <pointLight position={[0.5, -2.2, 2.2]} intensity={2} />
           <Suspense fallback={<Loader />}>
             <HDRIEnvironment url={HDRI_URL} onReady={handleReady} />
             {/* maxDuration: drei's default is 1s, animating the camera from its
@@ -574,33 +716,29 @@ export default function ObjModelViewer({ onPenToggle, onLoadProgress, onReady })
                 into it — same end framing, no transient angles exposed. */}
             {/* margin: how much empty space Bounds leaves around the fitted
                 object — lower means the camera sits closer, so the model reads
-                larger on screen. Tightened from 1.3 to make the bottle
-                slightly bigger while still leaving a clear margin. */}
+                larger on screen. Restored to its previous working size —
+                1.15 read as too small/zoomed out on laptop/desktop. */}
             <Bounds fit margin={0.96} maxDuration={0.001}>
-              <Center position={[0, 0, 0]}>
-                <SharpiePenModel onPenToggle={onPenToggle} onLoadProgress={onLoadProgress} />
-              </Center>
+              {/* Spins horizontally (auto-spin + drag) instead of the camera
+                  orbiting it, so the fixed lights/HDRI actually sweep across
+                  the surface as it turns — see TurntableGroup. Vertical drag
+                  orbits the camera instead (also handled inside
+                  TurntableGroup), so the model never moves vertically in
+                  world space at all. Sits outside Center so it spins around
+                  the model's own measured center, not whatever the FBX's raw
+                  local origin happens to be. */}
+              <TurntableGroup>
+                <Center position={[0, 0, 0]}>
+                  <SharpiePenModel onPenToggle={onPenToggle} onLoadProgress={onLoadProgress} />
+                </Center>
+              </TurntableGroup>
             </Bounds>
+            {/* Sibling of Bounds/TurntableGroup — stays fixed on the floor.
+                Vertical "movement" is a camera orbit now (see
+                TurntableGroup), not the model translating/tilting, so a
+                static shadow always stays correctly positioned under it. */}
             <ShadowBlob />
           </Suspense>
-          <OrbitControls
-            makeDefault
-            autoRotate
-            autoRotateSpeed={1.2}
-            enablePan={false}
-            // Scroll/pinch zoom would let the user change the model's apparent
-            // size away from the fixed framing Bounds just set up — disabled
-            // so the size stays exactly as fitted, not user-adjustable.
-            enableZoom={false}
-            // Vertical orbit only — horizontal (azimuth) stays unrestricted, still
-            // a full 360°. Polar angle is measured from world "up" (0 = straight
-            // down from above, PI = straight up from below); the camera starts at
-            // [0,0,4] looking at the origin, i.e. the default horizontal view sits
-            // at PI/2. More room downward (to peek further into the holder's
-            // opening) than upward (kept tight so the underside stays out of view).
-            minPolarAngle={Math.PI / 2 - 0.6}
-            maxPolarAngle={Math.PI / 2 + 0.06}
-          />
         </Canvas>
       </ModelErrorBoundary>
       {/* Fresh useState per mount, so this re-covers correctly every time

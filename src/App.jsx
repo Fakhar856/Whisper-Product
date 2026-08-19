@@ -126,7 +126,7 @@ function App() {
       </div>
       <section className="product">
         <div className="product-info">
-          <h1>PenSense Lite &amp; Notifier Bundle</h1>
+          {/* <h1>PenSense Lite &amp; Notifier Bundle</h1> */}
           {/* <p className="product-subtitle">Color Match Set</p> */}
           {/* <p className="product-price">$249</p> */}
 
@@ -157,7 +157,7 @@ function App() {
           <div className="product-tab-panel">
             {activeTab === 'Description' && (
               <div className="tab-description">
-                <h2>The Ultimate Color Match + Peek System in One Bundle</h2>
+                <h1>PenSense Lite &amp; Notifier Bundle</h1>
                 <p>
                   This bundle pairs <strong>PenSense Lite</strong> with the <strong>Notifier 3</strong> to
                   create a fully self-contained, professional-grade color prediction and peek
