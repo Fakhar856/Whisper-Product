@@ -120,11 +120,19 @@
 }
 
 /* Media column — centered in its own track so the bottle never drifts
-   toward the text on the left or the empty space on the right. */
+   toward the text on the left or the empty space on the right. Explicit
+   stacking layer (position + z-index) so the 3D canvas always paints above
+   the notifier image, regardless of DOM order — the image's own transform
+   (translateX/scale, see .notifier-image) shifts it visually into this
+   column's screen space, and without an explicit z-index here it was
+   painting on top of the model instead of behind it, since .product-spacer
+   comes later in the DOM. */
 .product-media {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  z-index: 2;
 }
 
 .product-media-primary {
@@ -137,12 +145,16 @@
 /* Right third: the Notifier 3 device shot. Shows LOGO.png by default and
    swaps to the matching color shot while that pen is picked up (see
    onPenToggle in App.jsx) — every image here is the same 1325x454 source
-   photo, so the box never resizes or shifts between states. */
+   photo, so the box never resizes or shifts between states. Explicit lower
+   z-index than .product-media — see the comment there — so this always
+   paints behind the 3D model wherever the two visually overlap. */
 .product-spacer {
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .notifier-image {
@@ -232,6 +244,11 @@
      viewport, pushing the lower paragraphs below the fold. */
   margin-top: 20px;
   margin-left: 24px;
+  /* Highest of the three columns' stacking layers — text/UI always sits
+     above both the model (z-index: 2) and the background image (z-index:
+     1), matching the intended background-image / model / UI layer order. */
+  position: relative;
+  z-index: 3;
 }
 
 .product-info h1 {
