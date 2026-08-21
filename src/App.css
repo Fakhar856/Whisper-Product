@@ -424,13 +424,6 @@
   animation: product-hint-pulse 2s ease-in-out infinite;
 }
 
-.product-hint-arrow {
-  font-style: normal;
-  color: var(--accent);
-  display: inline-block;
-  animation: product-hint-nudge 1.6s ease-in-out infinite;
-}
-
 @keyframes product-hint-pulse {
   0%,
   100% {
@@ -438,18 +431,6 @@
   }
   50% {
     box-shadow: 0 0 9px 3px color-mix(in srgb, var(--accent) 65%, transparent);
-  }
-}
-
-@keyframes product-hint-nudge {
-  0%,
-  100% {
-    transform: translateX(0);
-    opacity: 0.85;
-  }
-  50% {
-    transform: translateX(4px);
-    opacity: 1;
   }
 }
 
@@ -519,6 +500,7 @@
 
 @media (max-width: 860px) {
   .page {
+    align-items: center;
     padding: 16px 20px;
   }
 
@@ -542,6 +524,17 @@
 
   .product-media-primary {
     height: 380px;
+  }
+
+  /* Desktop pins this to the right edge of a wide column via left:100%; on
+     the narrow stacked layout there's no side column to reach into, so
+     anchor from the right edge of the canvas itself instead — off to one
+     side like on laptop, not centered over the pens. */
+  .product-hint {
+    top: 40px;
+    left: auto;
+    right: 24px;
+    transform: none;
   }
 
   /* translateX(-170px) and the 1.3x scale were compensating for sitting in
@@ -568,6 +561,16 @@
 
   .notifier-image {
     max-width: 240px;
+  }
+
+  .product-hint {
+    top: 28px;
+    left: auto;
+    right: 16px;
+    transform: none;
+    padding: 6px 11px 6px 10px;
+    font-size: 11.5px;
+    gap: 7px;
   }
 
   .page-loader-ring {

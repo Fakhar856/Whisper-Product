@@ -8,14 +8,14 @@ import * as THREE from 'three'
 // Hosted externally (Vercel Blob) rather than from public/ — at 136MB it's
 // over GitHub's 100MB push limit, and Vercel's build doesn't resolve Git LFS
 // pointers, so a git-tracked copy can't reliably reach production.
-const MODEL_URL = 'https://kagfwvv0cdnbanck.public.blob.vercel-storage.com/SHARPIE%20PEN.fbx'
+const MODEL_URL = 'https://kagfwvv0cdnbanck.public.blob.vercel-storage.com/pen%2001.fbx'
 // Vercel Blob's CORS config doesn't expose Content-Length to cross-origin
 // fetch() (only a fixed safelist of headers is exposed unless the server
 // adds Access-Control-Expose-Headers, which this endpoint doesn't), so
 // event.total/lengthComputable from the loader's progress callback can't be
 // trusted here — falls back to this known exact size instead, so the
 // progress bar keeps working smoothly regardless.
-const MODEL_SIZE_BYTES = 135993088
+const MODEL_SIZE_BYTES = 135950224
 const TEXTURE_URL = '/models/textures/sharpie-texture-bold.png'
 const HDRI_URL = encodeURI('/cayley_interior_2k.exr')
 
@@ -51,18 +51,16 @@ const MATERIAL_ROUGHNESS = 0.4
 const BODY_NAMES = new Set(['cuerpo_sharpie1', 'cuerpo_sharpie002'])
 const EXCLUDED_NAMES = new Set(['PenSenseV2_191120_Enclosure_STEP'])
 
-// Green and orange, by request: widen the label text a little (both sides,
+// By request: widen the label text a little on every pen (both sides,
 // symmetric about center) while leaving its height/thickness/placement alone.
 // repeat.x controls the label's reading-direction extent post-rotation; repeat.y
 // (left untouched at 1) is the perpendicular one — confirmed empirically, since
 // which axis maps to which visual direction isn't obvious once the -90° label
 // rotation is factored in. <1 enlarges that axis, so 0.9 is a ~11% subtle widen.
-const WIDENED_PEN_INDICES = new Set([1, 5])
-const WIDEN_REPEAT_X = 0.9
+const WIDEN_REPEAT_X = 0.45
 
 // Pen index -> color key, matching buildPenGroups' output order (confirmed
-// via each body's sibling cap material color, same mapping used above for
-// WIDENED_PEN_INDICES: 1 is green, 5 is orange).
+// via each body's sibling cap material color).
 const PEN_COLOR_KEYS = ['red', 'green', 'yellow', 'black', 'blue', 'orange']
 
 // This asset is authored Z-up (3ds Max convention) and Cylinder001 carries a
@@ -223,14 +221,17 @@ function SharpiePenModel({ onPenToggle, onLoadProgress, ...props }) {
 
   const penGroups = buildPenGroups(fbx)
 
-  // Same texture, same rotation/placement — repeat.x alone pulled in slightly
-  // so the label reads a little wider, symmetric about its own center.
+  // Same texture, same rotation/placement — one repeat axis pulled in
+  // slightly so the label reads wider around the barrel, symmetric about its
+  // own center. Which axis is which flips depending on the mesh's own UV
+  // layout (see the -90° rotation above) — this model's UVs put the
+  // around-the-barrel direction on repeat.y, not repeat.x.
   const labelTextureWidened = useMemo(() => {
     const t = labelTexture.clone()
     t.needsUpdate = true
     t.center.set(0.5, 0.5)
     t.rotation = -Math.PI / 2
-    t.repeat.set(WIDEN_REPEAT_X, 1)
+    t.repeat.set(1, WIDEN_REPEAT_X)
     return t
   }, [labelTexture])
 
@@ -267,7 +268,7 @@ function SharpiePenModel({ onPenToggle, onLoadProgress, ...props }) {
     mats.forEach((mat) => {
       if (mat.name === 'cuerpo sharpie:1 #3') {
         mat.color.set(0xffffff)
-        mat.map = WIDENED_PEN_INDICES.has(child.userData.penIndex) ? labelTextureWidened : labelTexture
+        mat.map = labelTextureWidened
         mat.needsUpdate = true
       }
     })
